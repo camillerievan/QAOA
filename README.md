@@ -1,2 +1,2 @@
 # QAOA
-Final QAOA Solution
+Final QAOA Solution for my dissertation.
