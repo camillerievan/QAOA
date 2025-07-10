@@ -1,4 +1,4 @@
-...
+```
 Main program is ex09_x.py
 
 Use the settings.yaml file to set the parameters of the program
@@ -21,4 +21,4 @@ show_circuit: true                          # true to display the circuit visual
 build_in_qiskit: false                      # true builds the circuit in Qulacs and Qiskit, else it builds it only in Qulacs
 run_qaoa: true                              # execute the QAOA circuit                  
 folder: 'C:...\%REF%_output_%Y%m%d_%H%M%S'  # folder to save data
-...
+```
