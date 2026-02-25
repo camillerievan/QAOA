@@ -51,7 +51,10 @@ class LocalDB:
                 [approximation_ratio] [real] NULL,
                 [final_mixer_angles] [nvarchar](500) NULL,
                 [final_cost_angles] [nvarchar](1000) NULL,
-                [classical_call_count] int NULL
+                [classical_call_count] int NULL,
+                [statevector] text NULL,
+                [mana] [real] NULL,
+                [renyientropy] [real] NULL
               )
               '''
         c.execute(sql)  # create tables
@@ -93,6 +96,23 @@ class LocalDB:
               '''
         c.execute(sql)  # create tables
 
+        sql = '''
+              CREATE TABLE IF NOT EXISTS tb_Test_RenyiEntropyByLayer
+              ( [rebl_pk] [integer] primary key AUTOINCREMENT,
+                [test_fk] [integer] NULL,
+                [layer] [integer] NULL,
+                [renyientropy] [text] NULL
+              )
+              '''
+        c.execute(sql)  # create tables
+
+        sql = '''
+              CREATE TABLE IF NOT EXISTS tb_NonDegenerateCostFunction
+              ( [ndcf_pk] [integer] primary key AUTOINCREMENT,
+                [x_problem] [text] NULL
+              )
+              '''
+        c.execute(sql)  # create tables
 
         conn.commit()
         conn.close()

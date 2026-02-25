@@ -1,7 +1,9 @@
 import sys
 import yaml
+import os
 from datetime import datetime
 from time import monotonic, sleep
+import inspect
 from humanfriendly import format_timespan
 from enum import Enum
 from collections import OrderedDict
@@ -11,6 +13,8 @@ import hypernetx as hnx
 from localdb import LocalDB
 import qubovert
 from qubovert import boolean_var
+import numpy as np
+
 # internal
 from observable_builder import ObservableBuilder
 from qaoa_circuit import QaoaCircuit, InitialAngles, CircuitType, OrbitLibrary
@@ -36,6 +40,9 @@ execution_ref = settings['execution_ref']
 load_graphs = settings['load_graphs']
 internal_graph_indexes = settings['internal_graph_indexes']
 save_to_db = settings['save_to_db']
+save_statevector = settings['save_statevector']
+calculate_mana = settings['calculate_mana']
+calculate_renyientropy = settings['calculate_renyientropy']
 console_to_file = settings['console_to_file']
 action = getattr(Action, settings['action'])  # Action is an enum
 layer_range = settings['layer_range']
@@ -54,14 +61,40 @@ build_in_qiskit = settings['build_in_qiskit']
 run_qaoa = settings['run_qaoa']
 
 # Handling the dynamic folder name with datetime
+jobid = os.environ.get("SLURM_JOB_ID", "nojid")
+now = datetime.now()
+
 folder_template = settings['folder']
-folder = folder_template.replace("%Y%m%d_%H%M%S", datetime.now().strftime("%Y%m%d_%H%M%S")).replace("%REF%", execution_ref)
+
+folder = (
+    folder_template
+    .replace("%REF%", execution_ref)
+    .replace("%JOBID%", str(jobid))
+    .replace("%Y%m%d_%H%M%S", now.strftime("%Y%m%d_%H%M%S"))
+)
+
+# ************************************************************************************
+#if console_to_file:
+#    # Open the file for writing
+#    output_file = open(f'{folder}.txt', 'w')
+#    sys.stdout = output_file  # Redirect stdout to the file
 
 # ************************************************************************************
 if console_to_file:
-    # Open the file for writing
-    output_file = open(f'{folder}.txt', 'w')
-    sys.stdout = output_file  # Redirect stdout to the file
+    path = f"{folder}.txt"
+
+    # Line-buffered text output (flushes on every newline)
+    output_file = open(path, "w", buffering=1, encoding="utf-8")
+
+    sys.stdout = output_file
+    sys.stderr = output_file  # important: errors go to same file
+
+    # If available (Python 3.7+), force write-through as well
+    try:
+        sys.stdout.reconfigure(line_buffering=True, write_through=True)
+        sys.stderr.reconfigure(line_buffering=True, write_through=True)
+    except Exception:
+        pass
 
 # PRINT PARAMETERS OF THIS RUN
 print('*' * 50)
@@ -82,6 +115,8 @@ info('try_all_initial_angles', try_all_initial_angles)
 info('build_circuit', build_circuit)
 info('build_in_qiskit', build_in_qiskit)
 info('run_qaoa', run_qaoa)
+info('save_statevector', save_statevector)
+info('calculate_renyientropy', calculate_renyientropy)
 info('save_to_db', save_to_db)
 info('console_to_file', console_to_file)
 info('folder', folder)
@@ -106,7 +141,8 @@ table_fields = ('execution_ref', 'n', 'maximize', 'classical_optimiser', 'poly_p
                 , 'circuit_depth', 'circuit_depth_cx', 'circuit_depth_cx_parallel'
                 , 'transpiled_circuit_depth', 'transpiled_circuit_depth_cx', 'transpiled_circuit_depth_cx_parallel'
                 , 'result_bitstring', 'nfev', 'result', 'result_optimal', 'probability', 'expectation'
-                , 'approximation_ratio', 'graph_fk', 'final_mixer_angles', 'final_cost_angles', 'classical_call_count')
+                , 'approximation_ratio', 'graph_fk', 'final_mixer_angles', 'final_cost_angles', 'classical_call_count'
+                , 'statevector', 'mana', 'renyientropy')
 
 record: tuple = tuple()
 problems = []
@@ -138,18 +174,27 @@ def format_hyper_string(hyper: set, my_alternate: bool, is_weighted: bool):
     for i, tup in enumerate(hyper):
         if is_weighted:
             if tup[0] < 0:
-                coefficient = f'- {abs(tup[0])}'
+                #coefficient = f'- {abs(tup[0])}'
+                #DLT   DEGENERATE-LIFTING-TERM #EVAN
+                coefficient = f"- {float(abs(tup[0])):.8f}".rstrip('0').rstrip('.')
             elif tup[0] > 0:
-                coefficient = f'+ {tup[0]}'
+                #coefficient = f'+ {tup[0]}'
+                #DLT
+                coefficient = f"+ {float(tup[0]):.8f}".rstrip('0').rstrip('.')
             else:
                 coefficient = '0'
 
             if coefficient != '0':
-                formatted_string += f" {coefficient} x{tup[1]} x{tup[2]} x{tup[3]}"
+                #formatted_string += f" {coefficient} x{tup[1]} x{tup[2]} x{tup[3]}"
+                #DLT
+                formatted_string += f" {coefficient}" + "".join(f" x{i}" for i in tup[1:])
+
         else:
             if my_alternate and i != 0:
                 sign = "-" if i % 2 != 0 else "+"
-            formatted_string += f" {sign} x{tup[0]} x{tup[1]} x{tup[2]}"
+            #formatted_string += f" {sign} x{tup[0]} x{tup[1]} x{tup[2]}"
+            #DLT
+            formatted_string += f" {sign}" + "".join(f" x{i}" for i in tup)
 
     # Remove the leading sign
     if formatted_string.startswith(('+', '-')):
@@ -235,13 +280,27 @@ def load_observable(problem_instance):
     obs, circuit_list = _obs_build.get_observable2(o_o)
     qubits = _obs_build.get_qubits()
 
-    #MIRCO
+    # Calculate the Eigenvalues and Eigenvectors
     u, v = eigh(obs.get_matrix().todense())
-    print(u)
-    print(v)
+    print('eigenvalues (sorted)')
+    print(u) #eigenvalues (sorted)
+    #print("Lowest 20:")
+    #print(u[:20])
+    #print("Highest 20:")
+    #print(u[-20:])
+
+    min_val = u[0]
+    min_count = np.sum(u == min_val)
+    if min_count == 1:
+        print("SINGLE MINIMA FOUND")
+    else:
+        print(f"DEGENERATE: {min_count}")
+
+    print('eigenvectors (columns correspond to eigenvalues)')
+    print(v) #eigenvectors (columns correspond to eigenvalues)
     #quit()
 
-    return obs,  circuit_list, qubits
+    return obs,  circuit_list, qubits, min_count
 
 
 def update_or_insert_field(field_name, new_result):
@@ -466,15 +525,42 @@ else:
                 # Convert string back to a set of tuples using eval
                 set_of_tuples = eval(line.strip())
                 x_problem = format_hyper_string(set_of_tuples, True, is_weighted)
+                print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+                print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+                print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+                print(x_problem)
+                print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+                print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+                print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+
                 problem_instance = Problem(x_problem, None, None, None, Action.MAXIMIZE, do_nothing)
                 edge_list = create_edge_list_from_z(problem_instance.z_problem)
                 H = hnx.Hypergraph(edge_list)
                 problems.append({"stX": x_problem, "stZ": problem_instance.z_problem, "nx": None, "hnx": H})
 
+                a, b, c, count = load_observable(problem_instance)
 
+                if count == 1:
+                    print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
+                    print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
+                    print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
+                    print(x_problem)
+                    db.insert_db('tb_NonDegenerateCostFunction'
+                               , 'ndcf_pk'
+                               , ('x_problem',)
+                               , (x_problem,) )
+                    print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
+                    print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
+                    print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
+
+quit()
 # endregion
 
+print('*************************************************************')
+print(problems)
+
 start_program_time = monotonic()
+
 
 #load entry from db or generate-list
 for problem_index, problem in enumerate(problems, start=0):
@@ -500,7 +586,7 @@ for problem_index, problem in enumerate(problems, start=0):
             #my_initial_angles = [7.85400547e-01, 3.92700590e+00, 7.85398605e-01,-2.74233551e-05, 4.03686142e+00, 3.08284530e-01, -3.01648381e-05, -6.65243337e-05, 3.05372498e-05, 7.91923845e+00, 1.25669170e+01, -9.82735483e-05, 1.25660837e+01, 1.25663232e+01, 1.84595323e+00, 7.21183884e+00]
 
             for optimization in optimization_loop:
-                obs, circuit_list, qubits = load_observable(problem_instance)
+                obs, circuit_list, qubits, min_count = load_observable(problem_instance)
 
                 record = tuple(record_backup)
                 update_or_insert_field('execution_ref', execution_ref)
@@ -528,6 +614,10 @@ for problem_index, problem in enumerate(problems, start=0):
                     update_or_insert_field('qubits', qubits)
 
                     for classical_optimzer in classical_optimizer_loop:
+
+                        wip_time_start = monotonic()
+                        print(f"time taken (test:{inspect.currentframe().f_lineno}) Run time {format_timespan(monotonic() - wip_time_start)}")
+
                         if build_circuit:
                             #get the internal graph name
                             internal_graph_name = internal_graph_indexes[problem_index] if load_graphs == '' else ''
@@ -536,7 +626,11 @@ for problem_index, problem in enumerate(problems, start=0):
                                             , problem_instance.z_problem, problem_instance.cost_function.pretty_str(), graph_type
                                             , save_to_db, db if save_to_db else None, 0, graphpk, problem
                                             , CircuitType.Qaoa_Problem_Specific, my_initial_angles
-                                            , update_or_insert_field, orbit_library, internal_graph_name)
+                                            , update_or_insert_field, orbit_library, internal_graph_name
+                                            , calculate_mana, calculate_renyientropy)
+
+                            print(f"time taken (test:{inspect.currentframe().f_lineno}) Run time {format_timespan(monotonic() - wip_time_start)}")
+
                             if q.no_automorphism():
                                 print('Graph has no automorphism')
                             else:
@@ -548,6 +642,8 @@ for problem_index, problem in enumerate(problems, start=0):
                                 # build_circuit
                                 q.build_circuit(q.get_initial_angles(), build_in_qiskit, update_or_insert_field, shuffle, show_circuit)
 
+                                print(f"time taken (test:{inspect.currentframe().f_lineno}) Run time {format_timespan(monotonic() - wip_time_start)}")
+
                                 # visualize2
                                 #if show_circuit:
                                 #    q.visualize2()
@@ -556,14 +652,34 @@ for problem_index, problem in enumerate(problems, start=0):
                                 if run_qaoa:
                                     start_time = datetime.now()
 
-                                    answer, expectation = q.minimize(classical_optimzer)
+                                    answer, expectation, renyi_entropy_per_layer = q.minimize(classical_optimzer, wip_time_start)
+
+                                    print(f"time taken (test:{inspect.currentframe().f_lineno}) Run time {format_timespan(monotonic() - wip_time_start)}")
 
                                     update_or_insert_field('classical_optimiser', classical_optimzer)
                                     update_or_insert_field('expectation', -expectation if action == Action.MAXIMIZE else expectation)
                                     update_or_insert_field('execution_time', (datetime.now() - start_time).total_seconds())
 
+                                    if save_statevector:
+                                        update_or_insert_field('statevector', q._final_statevector)
+                                    else:
+                                        update_or_insert_field('statevector', '')
+
+                                    if calculate_mana:
+                                        update_or_insert_field('mana', q._mana)
+                                    else:
+                                        update_or_insert_field('mana', -1)
+
+                                    if calculate_renyientropy:
+                                        update_or_insert_field('renyientropy', q._renyientropy)
+                                    else:
+                                        update_or_insert_field('renyientropy', -1)
+
+
                                     # loop all answers to make sure to find the top value
                                     max_answer, prob, nfound, bitstrings_found = get_max_answer(problem_instance.cost_problem, answer, max_answer)
+
+                                    print(f"time taken (test:{inspect.currentframe().f_lineno}) Run time {format_timespan(monotonic() - wip_time_start)}")
 
                                     print('')
                                     print('### THIS IS WHAT WE WILL SAVE TO DB ###')
@@ -601,6 +717,8 @@ for problem_index, problem in enumerate(problems, start=0):
                                     print(f'PROBABILITY (%)     : {prob} ({bitstrings_found})')
                                     print(f'RESULTS FOUND       : {nfound}')
                                     print(f'AR                  : {(-expectation if action == Action.MAXIMIZE else expectation) / max_answer}')
+                                    if calculate_renyientropy:
+                                        print(f'MAGIC (renyientropy): {q._renyientropy}')
 
                                     update_or_insert_field('angle_count', len(q.get_initial_angles()))
                                     update_or_insert_field('final_mixer_angles', final_mixer_angles)
@@ -612,9 +730,18 @@ for problem_index, problem in enumerate(problems, start=0):
                                         pk = db.insert_db('tb_Test', 'test_pk', table_fields, record)
                                         # update tb_Test_Angle where test_fk = 0 to pk
                                         db.update_db('tb_Test_Angle', 'test_fk', 0, ('test_fk',), (pk,))
+                                        # update by renyi entropy by layer
+                                        for index, re in enumerate(renyi_entropy_per_layer, start=1):
+                                            print(index, re)
+                                            db.insert_db('tb_Test_RenyiEntropyByLayer'
+                                                       , 'test_pk'
+                                                       , ('test_fk', 'layer', 'renyientropy')
+                                                       , (pk, index, re))
+
+
 
                             print('-----------------')
-                            quit()
+                            #quit()
                             
 elapsed_time = monotonic() - start_program_time
 print(f"time taken (all tests) Run time {format_timespan(elapsed_time)}")

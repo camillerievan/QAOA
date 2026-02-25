@@ -194,7 +194,10 @@ class Problem:
                 coefficients.append(float(coeff))
 
             # Extract x-values
-            x_tuple = tuple(int(x[1:]) for x in parts)
+            #x_tuple = tuple(int(x[1:]) for x in parts)
+            #DLT          DEGENERATE-LIFTING-TERM #EVAN
+            x_tuple = tuple(int(p[1:]) for p in parts if p.startswith('x'))
+
             x_values.append(x_tuple)
 
         # Output results
@@ -203,7 +206,9 @@ class Problem:
     def x_pubo(self, C: qubovert.PUBO) -> (int, str):
         input_expression = C.pretty_str()
         output_expression = input_expression.replace('x(x', 'x(')
-        return C.num_binary_variables, output_expression
+        #return C.num_binary_variables, output_expression
+        n_qubits = max(int(v[1:]) for v in C.variables) + 1
+        return n_qubits, output_expression
 
     def x_pubo_qubo(self, C: qubovert.PUBO, pairs: set) -> (int, str):
         # create the variables

@@ -156,6 +156,8 @@ class ObservableBuilder:
         self._circuit_list = Circuit.observable_to_circuit(final_observable)
         # [print(instance) for instance in circuit_list]
         n = self.get_qubits()
+        print(f'number of qubits: {n}')
+        print('[][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][]')
         cost_observable = Observable(n)
         for _c in self._circuit_list:
             cost_observable.add_operator(PauliOperator(_c.get_pauli_matrices(), _c.get_coefficient()))

@@ -1,11 +1,15 @@
 from enum import Enum
 import math
 import random
+import json
 import matplotlib.pyplot as plt
 import numpy as np
 import networkx as nx
 import hypernetx as hnx
 from queue import Queue
+from time import monotonic
+from humanfriendly import format_timespan
+import inspect
 #
 from qulacs import QuantumState, QuantumCircuit, Observable, PauliOperator
 from qulacs.gate import H, CNOT, RX, RZ, RY
@@ -31,6 +35,8 @@ import graph_automorphism as gax
 import graph_automorphism_nauty as gan
 import graph_automorphism_generic as gen
 from evan_library import info, insert_with_padding, AngleStudy, GraphType
+from mana import compute_mana_from_statevector
+from renyientropyc import renyi_entropy
 #
 
 coef_hell:bool = False
@@ -81,7 +87,8 @@ class QaoaCircuit:
                  , save_to_db: bool, db,  testfk: int, graphpk: int, problem: dict
                  , ansatz: CircuitType = CircuitType.Qaoa_Problem_Specific
                  , actual_initial_angles = None, update_or_insert_field = None
-                 , orbit_library: OrbitLibrary = OrbitLibrary.igraph, internal_graph_name: str = ''):
+                 , orbit_library: OrbitLibrary = OrbitLibrary.igraph, internal_graph_name: str = ''
+                 , calculate_mana = False, calculate_renyientropy = False):
 
         self._layers = layers
         self._qubits = qubits
@@ -92,6 +99,8 @@ class QaoaCircuit:
         self._angle_study = angle_study
         self._angle_iteration = 0
         self._show_circuit = show_circuit
+        self._calculate_mana = calculate_mana
+        self._calculate_renyientropy = calculate_renyientropy
 
         self._cost_function = cost_function
         self._binary_function = binary_function
@@ -187,6 +196,11 @@ class QaoaCircuit:
         self._final_angles = []
         self._ncalls = 0
         self._nfev = 0
+
+        self._wip_time_start = monotonic()
+
+    def encode_statevector(self, vec):
+        return json.dumps([[float(z.real), float(z.imag)] for z in vec])
 
     def save_graph_data(self, problem: dict):
         print('#' * 50)
@@ -672,6 +686,10 @@ class QaoaCircuit:
         self._state.set_zero_state()
         circuit.update_quantum_state(self._state)
 
+
+        ##statevector = self._state.get_vector() ############# TODO: save FINAL STATE EVAN MIRKO
+        ##not here
+
         if build_in_qiskit:
             transpiled_circuit = qiskit.transpile(qiskit_qc, basis_gates=['sx', 'rz', 'cx'], optimization_level=3)
             #transpiled_circuit = qiskit.transpile(qiskit_qc, basis_gates=['u1', 'u2', 'u3', 'cx'], optimization_level=3)
@@ -894,18 +912,27 @@ class QaoaCircuit:
         self._ncalls += 1
 
 
-    def minimize(self, method: str = 'BFGS'):
+    def minimize(self, method: str = 'BFGS', wip_time_start = monotonic()):
+
+        print(f"time taken #minimize# (test:{inspect.currentframe().f_lineno}) Run time {format_timespan(monotonic() - self._wip_time_start)}")
+
         if method.lower() == 'none':
             expectation = self.build_circuit(self._initial_angles)
+            print(f"time taken #minimize# (test:{inspect.currentframe().f_lineno}) Run time {format_timespan(monotonic() - self._wip_time_start)}")
         else:
             self._ncalls = 0
             self._nfev = 0
             result = minimize(self.build_circuit, self._initial_angles, options={'maxiter': 500}, method=method, callback=self.callback_function)
+            print(f"time taken #minimize# (test:{inspect.currentframe().f_lineno}) Run time {format_timespan(monotonic() - self._wip_time_start)}")
             expectation = result.fun
             self._nfev = result.nfev
             info(f'Function Evaluation', result.nfev)
             info(f'final angles ({len(result.x)})', result.x)     # final angles
             self._final_angles = result.x
+
+            #2026-02-20 get Rényi entropy per layer
+            renyi_entropy_per_layer = self.replay_magic_per_layer(self._final_angles, shuffle=0)
+            info("Rényi entropy per layer >>>>>>>>>>>>>>>>", renyi_entropy_per_layer)
 
         info('expectation', expectation)  # expectation
 
@@ -973,8 +1000,38 @@ class QaoaCircuit:
             plt.show()
 
         #--------------
+        #--------------
+        #--------------
 
-        return final_answer, expectation
+        # >>> SAVE ONLY THE FINAL STATEVECTOR HERE (Later to calculate MAGIC) <<<
+        final_statevector = np.copy(self._state.get_vector())
+
+        if self._calculate_mana:
+            self._mana, W = compute_mana_from_statevector(final_statevector)
+
+        if self._calculate_renyientropy:
+            D = 2               # Qudit dimension (2 = qubit)
+            N = self._qubits    # Number of qudits
+            n = 2               # Rényi parameter, keep this 2
+            self._renyientropy = renyi_entropy(final_statevector, n, D, N)
+
+        print('STATEVECTOR *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-')
+        print(final_statevector)
+        self._final_statevector = self.encode_statevector(final_statevector)
+
+        if self._calculate_mana:
+            print('MANA -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-')
+            print("Mana =", self._mana)
+
+        if self._calculate_renyientropy:
+            print('Rényi Entropy -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-')
+            print("Rényi Entropy =", self._renyientropy)
+
+        #--------------
+        #--------------
+        #--------------
+
+        return final_answer, expectation, renyi_entropy_per_layer
 
     @staticmethod
     def show_gantt(variable_limits, bitstring: str):
@@ -1043,3 +1100,58 @@ class QaoaCircuit:
         table = tabulate(table_data, t_headers, tablefmt='pipe')
 
         print(table)
+
+    def replay_magic_per_layer(self, angles: np.ndarray, shuffle: int = 0):
+        """
+        Replay the QAOA circuit layer-by-layer using 'angles' and compute magic after each layer.
+        Assumes the same parameter layout as build_qaoa_circuit():
+          angles = [beta (mixer first) | gamma (problem last)]
+        """
+        angles = np.asarray(angles, dtype=float)
+
+        # Split angles exactly like build_qaoa_circuit()
+        match self._angle_study:
+            case AngleStudy.just_one:
+                beta = gamma = angles
+            case _:
+                cut = self._layers * self._angle_count_per_layer_mixer
+                beta = angles[:cut]
+                gamma = angles[cut:]
+
+        # Start from |0...0>, then apply H on all qubits to get |+>^n (same as build_qaoa_circuit)
+        state = QuantumState(self._qubits)
+        state.set_zero_state()
+
+        init_circ = QuantumCircuit(self._qubits)
+        for q in range(self._qubits):
+            init_circ.add_H_gate(q)
+        init_circ.update_quantum_state(state)
+
+        renyi_list = []
+
+        # Apply each layer incrementally, then compute magic
+        for layer in range(self._layers):
+            layer_circ = QuantumCircuit(self._qubits)
+
+            # --- Cost unitary slice for THIS layer ---
+            g_from = layer * self._angle_count_per_layer_problem
+            g_to   = g_from + self._angle_count_per_layer_problem
+            self.add_U_C(layer_circ, gamma[g_from:g_to], build_in_qiskit=False, qiskit_qc=None, shuffle=shuffle)
+
+            # --- Mixer unitary slice for THIS layer ---
+            b_from = layer * self._angle_count_per_layer_mixer
+            b_to   = b_from + self._angle_count_per_layer_mixer
+            self.add_U_X(layer_circ, -2, beta[b_from:b_to], build_in_qiskit=False, qiskit_qc=None)
+
+            # Apply this layer to the evolving state
+            layer_circ.update_quantum_state(state)
+
+            # Compute Rényi entropy
+            final_statevector = np.copy(state.get_vector())
+            D = 2
+            N = self._qubits
+            n = 2
+            renyi = renyi_entropy(final_statevector, n, D, N)
+            renyi_list.append(renyi)
+
+        return renyi_list

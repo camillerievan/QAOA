@@ -1,0 +1,37 @@
+#!/bin/bash
+#SBATCH --job-name=MAGIC12
+#SBATCH --output=output/%x-%j-output.txt
+#SBATCH --ntasks=1
+
+cd "$SLURM_SUBMIT_DIR" || exit 1
+mkdir -p output
+
+JOB_START_TIME="$(date)"
+
+echo "Running on host:"
+hostname
+echo "Job started at: $JOB_START_TIME"
+
+# Run Python unbuffered
+python -u ex09_x.py &
+PY_PID=$!
+
+MEMFILE="output/${SLURM_JOB_NAME:-job}-${SLURM_JOB_ID}-memory.csv"
+
+(
+  echo "timestamp,pid,rss_mb,percent,command" > "$MEMFILE"
+  while ps -p "$PY_PID" >/dev/null 2>&1; do
+    ps -o pid=,rss=,pmem=,cmd= -p "$PY_PID" | \
+    awk '{printf "%s,%s,%.2f,%s,%s\n",
+          strftime("%Y-%m-%d %H:%M:%S"), $1, $2/1024, $3, substr($0, index($0,$4)) }' \
+    >> "$MEMFILE"
+    sleep 1
+  done
+) &
+MONITOR_PID=$!
+
+wait "$PY_PID"
+wait "$MONITOR_PID" 2>/dev/null
+
+echo "Job started at: $JOB_START_TIME"
+echo "Job finished at: $(date)"
