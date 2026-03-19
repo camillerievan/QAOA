@@ -22,6 +22,7 @@ from problem_data import Problem, Pubo, Qubo, Action
 from evan_library import info, AngleStudy, ClassicalOptimiser, GraphType
 from scipy.linalg import eigh
 
+debug_verbosity = 1
 
 class OptimizationType(Enum):
     PUBO = 0
@@ -280,27 +281,30 @@ def load_observable(problem_instance):
     obs, circuit_list = _obs_build.get_observable2(o_o)
     qubits = _obs_build.get_qubits()
 
-    # Calculate the Eigenvalues and Eigenvectors
-    u, v = eigh(obs.get_matrix().todense())
-    print('eigenvalues (sorted)')
-    print(u) #eigenvalues (sorted)
-    #print("Lowest 20:")
-    #print(u[:20])
-    #print("Highest 20:")
-    #print(u[-20:])
+    min_count = 0
+    min_val = 0
+    if debug_verbosity == 1:
+        # Calculate the Eigenvalues and Eigenvectors
+        u, v = eigh(obs.get_matrix().todense())
+        print('eigenvalues (sorted)')
+        print(u) #eigenvalues (sorted)
+        #print("Lowest 20:")
+        #print(u[:20])
+        #print("Highest 20:")
+        #print(u[-20:])
 
-    min_val = u[0]
-    min_count = np.sum(u == min_val)
-    if min_count == 1:
-        print("SINGLE MINIMA FOUND")
-    else:
-        print(f"DEGENERATE: {min_count}")
+        min_val = u[0]
+        min_count = np.sum(u == min_val)
+        if min_count == 1:
+            print("SINGLE MINIMA FOUND")
+        else:
+            print(f"DEGENERATE: {min_count}")
 
-    print('eigenvectors (columns correspond to eigenvalues)')
-    print(v) #eigenvectors (columns correspond to eigenvalues)
-    #quit()
+        print('eigenvectors (columns correspond to eigenvalues)')
+        print(v) #eigenvectors (columns correspond to eigenvalues)
+        #quit()
 
-    return obs,  circuit_list, qubits, min_count
+    return obs,  circuit_list, qubits, min_count, min_val
 
 
 def update_or_insert_field(field_name, new_result):
@@ -538,20 +542,21 @@ else:
                 H = hnx.Hypergraph(edge_list)
                 problems.append({"stX": x_problem, "stZ": problem_instance.z_problem, "nx": None, "hnx": H})
 
-                a, b, c, count = load_observable(problem_instance)
-
-                if count == 1:
-                    print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
-                    print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
-                    print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
-                    print(x_problem)
-                    db.insert_db('tb_NonDegenerateCostFunction'
-                               , 'ndcf_pk'
-                               , ('x_problem',)
-                               , (x_problem,) )
-                    print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
-                    print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
-                    print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
+                count = 0
+                if debug_verbosity == 1:
+                    a, b, c, count, min_val = load_observable(problem_instance)
+                    if count == 1:
+                        print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
+                        print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
+                        print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
+                        print(x_problem)
+                        db.insert_db('tb_NonDegenerateCostFunction'
+                                   , 'ndcf_pk'
+                                   , ('x_problem', 'min_val')
+                                   , (x_problem, min_val))
+                        print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
+                        print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
+                        print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
 
 quit()
 # endregion
@@ -586,7 +591,7 @@ for problem_index, problem in enumerate(problems, start=0):
             #my_initial_angles = [7.85400547e-01, 3.92700590e+00, 7.85398605e-01,-2.74233551e-05, 4.03686142e+00, 3.08284530e-01, -3.01648381e-05, -6.65243337e-05, 3.05372498e-05, 7.91923845e+00, 1.25669170e+01, -9.82735483e-05, 1.25660837e+01, 1.25663232e+01, 1.84595323e+00, 7.21183884e+00]
 
             for optimization in optimization_loop:
-                obs, circuit_list, qubits, min_count = load_observable(problem_instance)
+                obs, circuit_list, qubits, min_count, min_val = load_observable(problem_instance)
 
                 record = tuple(record_backup)
                 update_or_insert_field('execution_ref', execution_ref)

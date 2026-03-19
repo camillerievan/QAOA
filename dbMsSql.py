@@ -2,7 +2,7 @@ import pyodbc as odbc
 import sys
 
 server     = 'localhost'
-database   = 'Quantum_Magic_20260116'
+database   = 'Quantum_Magic_20260312'
 #username   = ''
 #password   = ''
 #connString = 'DRIVER={ODBC Driver 17 for SQL Server};SERVER=' + server + ';DATABASE=' + database + ';UID=' + username + ';PWD=' + password

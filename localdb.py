@@ -109,7 +109,8 @@ class LocalDB:
         sql = '''
               CREATE TABLE IF NOT EXISTS tb_NonDegenerateCostFunction
               ( [ndcf_pk] [integer] primary key AUTOINCREMENT,
-                [x_problem] [text] NULL
+                [x_problem] [text] NULL,
+                [min_val] [int] NULL
               )
               '''
         c.execute(sql)  # create tables

@@ -5,11 +5,12 @@ import networkx as nx
 import networkx.algorithms.approximation.maxcut as classical_maxcut
 import shutil
 import ast # used to transform string to 'list of tuples'
+import pandas as pd
 
 # move Dante sqlite3 file to local Sql Server file QuantumMaxCut database
 
-sourceDanteSqlFolder = 'C:\Bikini Atoll\QUANTUM\BACKUP 20251120\projects\ex09\_out20260208'
-ref_index = 'X_'
+sourceDanteSqlFolder = 'C:\Bikini Atoll\QUANTUM\BACKUP 20251120\projects\ex09\_out20260228'
+ref_index = 'M_'
 archiveDanteSqlFolder = sourceDanteSqlFolder + '/_archive'
 
 os.makedirs(archiveDanteSqlFolder, exist_ok=True)
@@ -57,6 +58,17 @@ for dbname in os.listdir(sourceDanteSqlFolder):
                                   )
                 cAn.close()
                 '''
+
+                # tb_Test_RenyiEntropyByLayer
+                cMg = conn.cursor()
+                cMg.row_factory = sqlite3.Row
+                cMg.execute(f'SELECT * FROM tb_Test_RenyiEntropyByLayer WHERE test_fk={tdante_fk}')
+                for rMg in cMg:
+                    sql.insert_db('tb_Test_RenyiEntropyByLayer', 'rebl_pk'
+                                  , ('Dante_fk' , 'test_fk', 'layer'     , 'renyientropy'     )
+                                  , (rMg['rebl_pk'], test_pk  , rMg['layer'], pd.to_numeric(rMg['renyientropy']))
+                                  )
+                cMg.close()
 
             cT.close()
 

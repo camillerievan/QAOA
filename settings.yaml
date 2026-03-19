@@ -1,7 +1,7 @@
 # settings.yaml
 
 execution_ref: 'XTEST4'
-load_graphs: '12a.hyperw'                       # 'ge8c.g6', 'ge10c.g6','12a.hyper', '12nd.hyperw'
+load_graphs: '12nd.hyperw'                       # 'ge8c.g6', 'ge10c.g6','12a.hyper', '12nd_magnetic.hyperw'
 internal_graph_indexes: ['q4']            # if load_graphs='' | q4, q5, q6, e9, q12, q13, q15, q4c
 save_to_db: true
 save_statevector: false
@@ -9,7 +9,7 @@ calculate_mana: true
 calculate_renyientropy: true
 console_to_file: false
 action: 'MAXIMIZE'
-layer_range: [5]
+layer_range: [1]
 classical_optimizer_loop: ['BFGS']
 angle_study_loop: ['ka']    # 'multi_angle', 'automorphism_global', 'ka', 'polynomial', 'default', automorphism_local'
 try_all_initial_angles: false
