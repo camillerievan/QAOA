@@ -10,7 +10,7 @@ import pandas as pd
 # move Dante sqlite3 file to local Sql Server file QuantumMaxCut database
 
 sourceDanteSqlFolder = 'C:\Bikini Atoll\QUANTUM\BACKUP 20251120\projects\ex09\_out20260228'
-ref_index = 'M_'
+ref_index = 'B_'
 archiveDanteSqlFolder = sourceDanteSqlFolder + '/_archive'
 
 os.makedirs(archiveDanteSqlFolder, exist_ok=True)
