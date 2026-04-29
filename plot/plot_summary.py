@@ -12,7 +12,7 @@ def get_connection_string() -> str:
 # =========================================================
 # CONFIG
 # =========================================================
-OUTPUT_DIR = r"C:\Bikini Atoll\QUANTUM\BACKUP 20251120\projects\ex09\_out20260228\_graph2"
+OUTPUT_DIR = r"C:\Bikini Atoll\QUANTUM\BACKUP 20251120\projects\ex09\_out20260228\_graph"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
@@ -20,23 +20,23 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 # LABEL MAPPING (DO NOT CHANGE FILTERING)
 # =========================================================
 LABEL_MAP = {
-    "default": "SA",
-    "multi_angle": "MA",
-    "ka": "KA",
+    "default": "SA-QAOA",
+    "multi_angle": "MA-QAOA",
+    "ka": r"$k$A-QAOA",
 }
 
-ORDER = ["MA", "KA", "SA"]
+ORDER = ["MA-QAOA", r"$k$A-QAOA", "SA-QAOA"]
 
 COLOUR_MAP = {
-    "MA": "red",
-    "KA": "orange",
-    "SA": "blue",
+    "MA-QAOA": "red",
+    r"$k$A-QAOA": "orange",
+    "SA-QAOA": "blue",
 }
 
 MARKER_MAP = {
-    "MA": "s",
-    "KA": "o",
-    "SA": "D",
+    "MA-QAOA": "s",
+    r"$k$A-QAOA": "o",
+    "SA-QAOA": "D",
 }
 
 
@@ -97,7 +97,14 @@ def setup_integer_xaxis(ax, x_values):
     ax.set_xticklabels(unique_layers)
 
 
-def plot_min_max(df, avg, minv, maxv, title, filename, ylabel):
+def plot_min_max(df, avg, minv, maxv, title, filename, ylabel, yscale=1):
+    plt.rcParams.update({
+        "font.size": 20,
+        "axes.labelsize": 20,
+        "xtick.labelsize": 20,
+        "ytick.labelsize": 20,
+        "legend.fontsize": 20,
+    })
     fig, ax = plt.subplots(figsize=(10, 6))
 
     all_x = []
@@ -109,9 +116,9 @@ def plot_min_max(df, avg, minv, maxv, title, filename, ylabel):
             continue
 
         x = d["Layers"].astype(int).to_numpy()
-        y = d[avg].astype(float).to_numpy()
-        ymin = d[minv].astype(float).to_numpy()
-        ymax = d[maxv].astype(float).to_numpy()
+        y = d[avg].astype(float).to_numpy() / yscale
+        ymin = d[minv].astype(float).to_numpy() / yscale
+        ymax = d[maxv].astype(float).to_numpy() / yscale
 
         all_x.extend(x)
 
@@ -130,8 +137,7 @@ def plot_min_max(df, avg, minv, maxv, title, filename, ylabel):
             alpha=0.15
         )
 
-    ax.set_title(title)
-    ax.set_xlabel("Layers")
+    ax.set_xlabel(r"$p$")
     ax.set_ylabel(ylabel)
     ax.grid(True)
 
@@ -140,13 +146,21 @@ def plot_min_max(df, avg, minv, maxv, title, filename, ylabel):
     ax.legend()
     plt.tight_layout()
 
-    plt.savefig(os.path.join(OUTPUT_DIR, filename), dpi=300)
+    svg_filename = os.path.splitext(filename)[0] + ".svg"
+    plt.savefig(os.path.join(OUTPUT_DIR, svg_filename), format="svg")
     plt.close()
 
     print(f"Exported: {filename}")
 
 
-def plot_std(df, avg, std, title, filename, ylabel):
+def plot_std(df, avg, std, title, filename, ylabel, yscale=1):
+    plt.rcParams.update({
+        "font.size": 20,
+        "axes.labelsize": 20,
+        "xtick.labelsize": 20,
+        "ytick.labelsize": 20,
+        "legend.fontsize": 20,
+    })
     fig, ax = plt.subplots(figsize=(10, 6))
 
     all_x = []
@@ -158,8 +172,8 @@ def plot_std(df, avg, std, title, filename, ylabel):
             continue
 
         x = d["Layers"].astype(int).to_numpy()
-        y = d[avg].astype(float).to_numpy()
-        s = d[std].fillna(0).astype(float).to_numpy()
+        y = d[avg].astype(float).to_numpy() / yscale
+        s = d[std].fillna(0).astype(float).to_numpy() / yscale
 
         all_x.extend(x)
 
@@ -178,8 +192,7 @@ def plot_std(df, avg, std, title, filename, ylabel):
             alpha=0.15
         )
 
-    ax.set_title(title)
-    ax.set_xlabel("Layers")
+    ax.set_xlabel(r"$p$")
     ax.set_ylabel(ylabel)
     ax.grid(True)
 
@@ -188,7 +201,8 @@ def plot_std(df, avg, std, title, filename, ylabel):
     ax.legend()
     plt.tight_layout()
 
-    plt.savefig(os.path.join(OUTPUT_DIR, filename), dpi=300)
+    svg_filename = os.path.splitext(filename)[0] + ".svg"
+    plt.savefig(os.path.join(OUTPUT_DIR, svg_filename), format="svg")
     plt.close()
 
     print(f"Exported: {filename}")
@@ -204,9 +218,11 @@ plot_std(df, "AR_Avg", "AR_StdDev",
          "AR (Std Dev)", "AR_StdDev.png", "AR")
 
 plot_min_max(df, "NFEV_Avg", "NFEV_Min", "NFEV_Max",
-             "NFEV (Min/Max)", "NFEV_Min_Max.png", "NFEV")
+             "NFEV (Min/Max)", "NFEV_Min_Max.png",
+             r"nfev ($\times 10^3$)", yscale=1000)
 
 plot_std(df, "NFEV_Avg", "NFEV_StdDev",
-         "NFEV (Std Dev)", "NFEV_StdDev.png", "NFEV")
+         "NFEV (Std Dev)", "NFEV_StdDev.png",
+         r"nfev ($\times 10^3$)", yscale=1000)
 
 print("\nDONE.")

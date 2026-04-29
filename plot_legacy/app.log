@@ -1,0 +1,65 @@
+2024-10-20 21:47:00,830 - INFO - Executing query: 
+                EXEC [dbo].[chart_helper_thesis_AB] 
+                    @graphType = ?, 
+                    @testIndex = ?, 
+                    @layers = ?, 
+                    @angle_study = ?, 
+                    @type = ?
+             with params: (1, 'AB', 1, 'ma', 2)
+2024-10-20 21:47:02,689 - INFO - DataFrame Columns: ['']
+2024-10-20 21:47:02,694 - INFO - DataFrame Head:
+                             
+0     4.0,783,325,875,204.973
+1   5.0,1081,1015,1411,147.58
+2  6.0,1271,1110,2079,361.125
+3  7.0,1613,1541,1975,161.742
+4  8.0,2351,2149,3364,452.804
+2024-10-20 21:49:11,982 - INFO - Executing query: 
+                EXEC [dbo].[chart_helper_thesis_AB] 
+                    @graphType = :graphType, 
+                    @testIndex = :testIndex, 
+                    @layers = :layers, 
+                    @angle_study = :angle_study, 
+                    @type = :type_
+             with params: {'graphType': 1, 'testIndex': 'AB', 'layers': 1, 'angle_study': 'ma', 'type_': 2}
+2024-10-20 21:49:12,175 - ERROR - Database error occurred: (pyodbc.ProgrammingError) ('The SQL contains 0 parameter markers, but 1 parameters were supplied', 'HY000')
+[SQL: 
+                EXEC [dbo].[chart_helper_thesis_AB] 
+                    @graphType = :graphType, 
+                    @testIndex = :testIndex, 
+                    @layers = :layers, 
+                    @angle_study = :angle_study, 
+                    @type = :type_
+            ]
+[parameters: {'graphType': 1, 'testIndex': 'AB', 'layers': 1, 'angle_study': 'ma', 'type_': 2}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+2024-10-20 21:50:55,003 - ERROR - Database error occurred: ('28000', "[28000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Login failed for user 'sa'. (18456) (SQLDriverConnect); [28000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Login failed for user 'sa'. (18456)")
+2024-10-20 21:53:10,197 - INFO - Fetched Columns: ['']
+2024-10-20 21:53:10,197 - INFO - DataFrame Columns After Cleaning: ['']
+2024-10-20 21:55:40,602 - INFO - Fetched Columns: ['']
+2024-10-20 21:55:40,602 - INFO - DataFrame Columns After Cleaning: ['']
+2024-10-20 21:57:52,855 - WARNING - No data found in any result set.
+2024-10-20 22:01:04,866 - INFO - Executing stored procedure with parameters: graphType=1, testIndex='AB', layers=1, angle_study='ma', type_=2
+2024-10-20 22:01:06,573 - INFO - Fetched Columns: ['']
+2024-10-20 22:01:06,574 - INFO - DataFrame Columns After Cleaning: ['']
+2024-10-20 22:01:53,139 - INFO - Executing stored procedure with parameters: graphType=1, testIndex='AB', layers=1, angle_study='ma', type_=2
+2024-10-20 22:01:53,245 - INFO - Fetched Columns: ['']
+2024-10-20 22:01:53,246 - INFO - DataFrame Columns After Cleaning: ['']
+2024-10-21 21:09:59,960 - INFO - Executing stored procedure with parameters: graphType=1, testIndex='AB', layers=1, angle_study='ma', type_=2
+2024-10-21 21:10:00,914 - INFO - Fetched Columns: ['n', 'average', 'min', 'max', 'stdev']
+2024-10-21 21:10:00,915 - INFO - DataFrame Columns After Cleaning: ['n', 'average', 'min', 'max', 'stdev']
+2024-10-21 21:12:45,517 - INFO - Executing stored procedure with parameters: graphType=1, testIndex='AB', layers=1, angle_study='ma', type_=2
+2024-10-21 21:12:46,567 - INFO - Fetched Columns: ['n', 'average', 'min', 'max', 'stdev']
+2024-10-21 21:12:46,568 - INFO - DataFrame Columns After Cleaning: ['n', 'average', 'min', 'max', 'stdev']
+2024-10-21 21:16:31,877 - INFO - Executing stored procedure with parameters: graphType=1, testIndex='AB', layers=1, angle_study='ma', type_=2
+2024-10-21 21:16:33,003 - INFO - Fetched Columns: ['n', 'average', 'min', 'max', 'stdev']
+2024-10-21 21:16:33,004 - INFO - DataFrame Columns After Cleaning: ['n', 'average', 'min', 'max', 'stdev']
+2024-10-21 21:16:33,008 - INFO - Executing stored procedure with parameters: graphType=1, testIndex='AB', layers=1, angle_study='ka', type_=2
+2024-10-21 21:16:33,182 - INFO - Fetched Columns: ['n', 'average', 'min', 'max', 'stdev']
+2024-10-21 21:16:33,183 - INFO - DataFrame Columns After Cleaning: ['n', 'average', 'min', 'max', 'stdev']
+2024-10-21 21:16:33,185 - INFO - Executing stored procedure with parameters: graphType=1, testIndex='AB', layers=1, angle_study='sa', type_=2
+2024-10-21 21:16:33,328 - INFO - Fetched Columns: ['n', 'average', 'min', 'max', 'stdev']
+2024-10-21 21:16:33,328 - INFO - DataFrame Columns After Cleaning: ['n', 'average', 'min', 'max', 'stdev']
+2024-10-21 21:16:33,331 - INFO - Executing stored procedure with parameters: graphType=1, testIndex='AB', layers=1, angle_study='am', type_=2
+2024-10-21 21:16:33,515 - INFO - Fetched Columns: ['n', 'average', 'min', 'max', 'stdev']
+2024-10-21 21:16:33,516 - INFO - DataFrame Columns After Cleaning: ['n', 'average', 'min', 'max', 'stdev']

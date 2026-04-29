@@ -164,6 +164,14 @@ def plot_graph(
         code_map[c] for c in desired_order if c in code_map
     ]
 
+    plt.rcParams.update({
+        "font.size": 13.5,
+        "axes.labelsize": 15,
+        "xtick.labelsize": 13.5,
+        "ytick.labelsize": 13.5,
+        "legend.fontsize": 13.5,
+    })
+
     plt.figure(figsize=(10, 6))
 
     style_map = {
@@ -173,9 +181,9 @@ def plot_graph(
     }
 
     label_map = {
-        "ma": "Multi-angle",
-        "ka": "k-interacting angle",
-        "sa": "Single-angle",
+        "ma": "MA-QAOA",
+        "ka": r"$k$A-QAOA",
+        "sa": "SA-QAOA",
     }
 
     ratio_map = (
@@ -208,9 +216,8 @@ def plot_graph(
             label=label,
         )
 
-    plt.title(f"Graph {graph_pk}")
-    plt.xlabel("p = layer")
-    plt.ylabel("magic = renyientropy")
+    plt.xlabel(r"$p$")
+    plt.ylabel(r"$M_2$")
     plt.xticks(sorted(df["layer"].dropna().unique()))
     plt.xlim(left=0)
     plt.ylim(bottom=0)

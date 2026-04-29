@@ -217,6 +217,14 @@ def plot_average_normalised(
         print("No summary data found.")
         return
 
+    plt.rcParams.update({
+        "font.size": 20,
+        "axes.labelsize": 20,
+        "xtick.labelsize": 20,
+        "ytick.labelsize": 20,
+        "legend.fontsize": 20,
+    })
+
     plt.figure(figsize=(10, 6))
 
     desired_order = ["ma", "ka", "sa"]
@@ -228,9 +236,9 @@ def plot_average_normalised(
     }
 
     label_map = {
-        "ma": "MA",
-        "ka": "KA",
-        "sa": "SA",
+        "ma": "MA-QAOA",
+        "ka": r"$k$A-QAOA",
+        "sa": "SA-QAOA",
     }
 
     available_codes = {
@@ -252,11 +260,10 @@ def plot_average_normalised(
         if band_mode.lower() == "std":
             y_low = subset["band_low_std"].to_numpy()
             y_high = subset["band_high_std"].to_numpy()
-            label = f"{short_label} mean ± std"
         else:
             y_low = subset["magic_min"].to_numpy()
             y_high = subset["magic_max"].to_numpy()
-            label = f"{short_label} mean (min-max band)"
+        label = short_label
 
         plt.fill_between(x, y_low, y_high, color=colour, alpha=0.18)
         plt.plot(
@@ -269,9 +276,8 @@ def plot_average_normalised(
             label=label,
         )
 
-    plt.title(f"Average normalised magic across all graphs (layers = {layers})")
-    plt.xlabel("p = layer")
-    plt.ylabel("normalised magic")
+    plt.xlabel(r"$p$")
+    plt.ylabel(r"$\tilde{M}_2$")
     plt.xlim(left=0)
     plt.ylim(0, 1.02)
     plt.xticks(sorted(summary_df["layer"].dropna().unique()))
@@ -283,12 +289,13 @@ def plot_average_normalised(
 
     if save_png:
         os.makedirs(output_dir, exist_ok=True)
-        output_file = os.path.join(
-            output_dir,
-            f"all_graphs_average_normalised_p{layers}_{band_mode.lower()}.png"
-        )
-        plt.savefig(output_file, dpi=150)
-        print(f"Saved image to: {output_file}")
+        base_name = f"all_graphs_average_normalised_p{layers}_{band_mode.lower()}"
+        png_file = os.path.join(output_dir, base_name + ".png")
+        svg_file = os.path.join(output_dir, base_name + ".svg")
+        plt.savefig(png_file, dpi=150)
+        plt.savefig(svg_file)
+        print(f"Saved image to: {png_file}")
+        print(f"Saved image to: {svg_file}")
 
     if display:
         plt.show()
