@@ -1,5 +1,6 @@
 import os
 import pyodbc
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -97,7 +98,15 @@ def setup_integer_xaxis(ax, x_values):
     ax.set_xticklabels(unique_layers)
 
 
-def plot_min_max(df, avg, minv, maxv, title, filename, ylabel, yscale=1):
+def plot_combined(df, avg, minv, maxv, std, filename, ylabel,
+                  yscale=1, ymax_cap=None, legend_loc="best"):
+    """
+    Combined chart:
+      - Light-coloured vertical bar:  mean ± std
+      - Black error-bar line:         min .. max
+      - Coloured line + markers:      mean
+    Series are offset horizontally so the bars don't overlap.
+    """
     plt.rcParams.update({
         "font.size": 20,
         "axes.labelsize": 20,
@@ -109,7 +118,14 @@ def plot_min_max(df, avg, minv, maxv, title, filename, ylabel, yscale=1):
 
     all_x = []
 
-    for label in ORDER:
+    # horizontal offsets: MA stays on the integer x, KA shifts right,
+    # SA shifts further right. Each series' marker AND its bar use the
+    # same x so the marker is always centred on its bar.
+    bar_width = 0.15
+    step = bar_width + 0.02
+    offsets = [i * step for i in range(len(ORDER))]
+
+    for i, label in enumerate(ORDER):
         d = df[df["Label"] == label].sort_values("Layers")
 
         if d.empty:
@@ -119,77 +135,52 @@ def plot_min_max(df, avg, minv, maxv, title, filename, ylabel, yscale=1):
         y = d[avg].astype(float).to_numpy() / yscale
         ymin = d[minv].astype(float).to_numpy() / yscale
         ymax = d[maxv].astype(float).to_numpy() / yscale
-
-        all_x.extend(x)
-
-        ax.plot(
-            x, y,
-            label=label,
-            color=COLOUR_MAP[label],
-            marker=MARKER_MAP[label],
-            linewidth=2,
-            markersize=8
-        )
-
-        ax.fill_between(
-            x, ymin, ymax,
-            color=COLOUR_MAP[label],
-            alpha=0.15
-        )
-
-    ax.set_xlabel(r"$p$")
-    ax.set_ylabel(ylabel)
-    ax.grid(True)
-
-    setup_integer_xaxis(ax, all_x)
-
-    ax.legend()
-    plt.tight_layout()
-
-    svg_filename = os.path.splitext(filename)[0] + ".svg"
-    plt.savefig(os.path.join(OUTPUT_DIR, svg_filename), format="svg")
-    plt.close()
-
-    print(f"Exported: {filename}")
-
-
-def plot_std(df, avg, std, title, filename, ylabel, yscale=1):
-    plt.rcParams.update({
-        "font.size": 20,
-        "axes.labelsize": 20,
-        "xtick.labelsize": 20,
-        "ytick.labelsize": 20,
-        "legend.fontsize": 20,
-    })
-    fig, ax = plt.subplots(figsize=(10, 6))
-
-    all_x = []
-
-    for label in ORDER:
-        d = df[df["Label"] == label].sort_values("Layers")
-
-        if d.empty:
-            continue
-
-        x = d["Layers"].astype(int).to_numpy()
-        y = d[avg].astype(float).to_numpy() / yscale
         s = d[std].fillna(0).astype(float).to_numpy() / yscale
 
         all_x.extend(x)
+        x_off = x + offsets[i]
+        colour = COLOUR_MAP[label]
 
-        ax.plot(
-            x, y,
-            label=label,
-            color=COLOUR_MAP[label],
-            marker=MARKER_MAP[label],
-            linewidth=2,
-            markersize=8
+        # truncate bars / errorbars at ymax_cap if provided
+        bar_top = y + s
+        err_top = ymax
+        if ymax_cap is not None:
+            bar_top = np.minimum(bar_top, ymax_cap)
+            err_top = np.minimum(err_top, ymax_cap)
+        bar_bottom = y - s
+
+        # ±1 std bar (light shade)
+        ax.bar(
+            x_off,
+            height=bar_top - bar_bottom,
+            bottom=bar_bottom,
+            width=bar_width,
+            color=colour,
+            alpha=0.25,
+            edgecolor="none",
+            zorder=1,
         )
 
-        ax.fill_between(
-            x, y - s, y + s,
-            color=COLOUR_MAP[label],
-            alpha=0.15
+        # min / max black error bars
+        ax.errorbar(
+            x_off, y,
+            yerr=[y - ymin, err_top - y],
+            fmt="none",
+            ecolor="black",
+            elinewidth=1,
+            capsize=0,
+            zorder=2,
+        )
+
+        # mean line + marker (same x as the bar)
+        ax.plot(
+            x_off, y,
+            label=label,
+            color=colour,
+            marker=MARKER_MAP[label],
+            linewidth=2,
+            markersize=8,
+            zorder=3,
         )
 
     ax.set_xlabel(r"$p$")
@@ -198,31 +189,24 @@ def plot_std(df, avg, std, title, filename, ylabel, yscale=1):
 
     setup_integer_xaxis(ax, all_x)
 
-    ax.legend()
+    ax.legend(loc=legend_loc)
     plt.tight_layout()
 
     svg_filename = os.path.splitext(filename)[0] + ".svg"
     plt.savefig(os.path.join(OUTPUT_DIR, svg_filename), format="svg")
     plt.close()
 
-    print(f"Exported: {filename}")
+    print(f"Exported: {svg_filename}")
 
 
 # =========================================================
 # EXPORT CHARTS
 # =========================================================
-plot_min_max(df, "AR_Avg", "AR_Min", "AR_Max",
-             "AR (Min/Max)", "AR_Min_Max.png", "AR")
+plot_combined(df, "AR_Avg", "AR_Min", "AR_Max", "AR_StdDev",
+              "AR.svg", "AR", ymax_cap=1.0)
 
-plot_std(df, "AR_Avg", "AR_StdDev",
-         "AR (Std Dev)", "AR_StdDev.png", "AR")
-
-plot_min_max(df, "NFEV_Avg", "NFEV_Min", "NFEV_Max",
-             "NFEV (Min/Max)", "NFEV_Min_Max.png",
-             r"nfev ($\times 10^3$)", yscale=1000)
-
-plot_std(df, "NFEV_Avg", "NFEV_StdDev",
-         "NFEV (Std Dev)", "NFEV_StdDev.png",
-         r"nfev ($\times 10^3$)", yscale=1000)
+plot_combined(df, "NFEV_Avg", "NFEV_Min", "NFEV_Max", "NFEV_StdDev",
+              "NFEV.svg", r"nfev ($\times 10^3$)", yscale=1000,
+              legend_loc="upper left")
 
 print("\nDONE.")

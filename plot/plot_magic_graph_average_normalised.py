@@ -225,7 +225,7 @@ def plot_average_normalised(
         "legend.fontsize": 20,
     })
 
-    plt.figure(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=(10, 6))
 
     desired_order = ["ma", "ka", "sa"]
 
@@ -248,43 +248,76 @@ def plot_average_normalised(
 
     ordered_codes = [available_codes[c] for c in desired_order if c in available_codes]
 
-    for code in ordered_codes:
+    # horizontal offsets: MA stays on the integer x, KA shifts right,
+    # SA shifts further right. Each series' marker AND its bar use the
+    # same x so the marker is always centred on its bar.
+    bar_width = 0.15
+    step = bar_width + 0.02
+    offsets = [i * step for i in range(len(ordered_codes))]
+
+    for i, code in enumerate(ordered_codes):
         subset = summary_df[summary_df["Code"] == code].sort_values("layer")
         code_key = str(code).strip().lower()
         colour, marker = style_map.get(code_key, ("black", "x"))
         short_label = label_map.get(code_key, str(code).upper())
 
-        x = subset["layer"].to_numpy()
+        x = subset["layer"].to_numpy().astype(float)
         y = subset["magic_mean"].to_numpy()
+        ymin = subset["magic_min"].to_numpy()
+        ymax = subset["magic_max"].to_numpy()
+        s = subset["magic_std"].fillna(0).to_numpy()
 
-        if band_mode.lower() == "std":
-            y_low = subset["band_low_std"].to_numpy()
-            y_high = subset["band_high_std"].to_numpy()
-        else:
-            y_low = subset["magic_min"].to_numpy()
-            y_high = subset["magic_max"].to_numpy()
-        label = short_label
+        x_off = x + offsets[i]
 
-        plt.fill_between(x, y_low, y_high, color=colour, alpha=0.18)
-        plt.plot(
-            x,
-            y,
+        # truncate bars / errorbars at 1.0 (M_2 is normalised)
+        import numpy as np
+        bar_top = np.minimum(y + s, 1.0)
+        err_top = np.minimum(ymax, 1.0)
+        bar_bottom = y - s
+
+        # ±1 std bar (light shade)
+        ax.bar(
+            x_off,
+            height=bar_top - bar_bottom,
+            bottom=bar_bottom,
+            width=bar_width,
+            color=colour,
+            alpha=0.25,
+            edgecolor="none",
+            zorder=1,
+        )
+
+        # min / max black error bars
+        ax.errorbar(
+            x_off, y,
+            yerr=[y - ymin, err_top - y],
+            fmt="none",
+            ecolor="black",
+            elinewidth=1,
+            capsize=0,
+            zorder=2,
+        )
+
+        # mean line + marker (same x as the bar)
+        ax.plot(
+            x_off, y,
             color=colour,
             marker=marker,
             linewidth=2,
-            markersize=6,
-            label=label,
+            markersize=8,
+            label=short_label,
+            zorder=3,
         )
 
-    plt.xlabel(r"$p$")
-    plt.ylabel(r"$\tilde{M}_2$")
-    plt.xlim(left=0)
-    plt.ylim(0, 1.02)
-    plt.xticks(sorted(summary_df["layer"].dropna().unique()))
-    plt.grid(True)
-    plt.axhline(0, linewidth=1)
-    plt.axvline(0, linewidth=1)
-    plt.legend(loc="upper right")
+    ax.set_xlabel(r"$p$")
+    ax.set_ylabel(r"$\tilde{M}_2$")
+    ax.set_xlim(left=-0.5)
+    ax.set_ylim(0, 1.02)
+    ax.set_xticks(sorted(summary_df["layer"].dropna().unique()))
+    ax.grid(True)
+    ax.axhline(0, linewidth=1)
+    ax.axvline(0, linewidth=1)
+    ax.legend(loc="upper right")
     plt.tight_layout()
 
     if save_png:
